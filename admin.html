@@ -120,6 +120,18 @@
           <div><label>QR 아래 글자</label><input id="t_qrCaption" type="text"></div>
         </div>
       </div>
+
+      <div class="card" id="copyCard">
+      <h2>내려받기 · 저작권 문구</h2>
+      <p class="note">슬라이드 화면의 <b>내려받기(⤓)</b> 창, PDF 마지막 장, PDF 모든 장 하단의 한 줄에 쓰입니다.</p>
+      <div class="two">
+        <div><label>제작자 이름</label><input id="c_owner" type="text"></div>
+        <div><label>직함</label><input id="c_role" type="text"></div>
+        <div><label>연락처 메일</label><input id="c_email" type="text"></div>
+        <div><label>저작권 연도</label><input id="c_year" type="text"></div>
+      </div>
+      <label>안내 문구 (줄바꿈 가능)</label><textarea id="c_notice" style="min-height:170px"></textarea>
+      </div>
     </div>
 
     <div id="tab-slides" style="display:none">
@@ -203,6 +215,7 @@ async function loadContent(){
   const m = await getMeta('content.json');
   C = JSON.parse(fromB64utf8(m.content));
   C.hidden = C.hidden || []; C.deleted = C.deleted || []; C.rev = C.rev || {};
+  C.copyright = { ...DEFAULT_COPY, ...(C.copyright || {}) };
   try { const r = await fetch('numbers.json'); if(r.ok) NUMS = await r.json(); } catch(e) {}
 }
 function logout(){ try{sessionStorage.removeItem('gh_tok');}catch(e){}; tok=''; location.reload(); }
@@ -215,6 +228,7 @@ function renderAll(){
   bind('a_pre',()=>a.titlePre,v=>a.titlePre=v); bind('a_em',()=>a.titleEm,v=>a.titleEm=v);
   bind('a_moreLabel',()=>a.moreLabel,v=>a.moreLabel=v); bind('a_moreUrl',()=>a.moreUrl,v=>a.moreUrl=v);
   for (const k of ['eyebrow','button','line1','line2','desc','sheet','qrCaption']) bind('t_'+k, ()=>t[k], v=>t[k]=v);
+  const cp=C.copyright; for (const k of ['owner','role','email','year','notice']) bind('c_'+k, ()=>cp[k], v=>cp[k]=v);
   renderRows(); renderSlides(); setDirty(false);
 }
 function renderRows(){
@@ -235,6 +249,10 @@ const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 $('addRow').onclick=()=>{ C.apps.rows.push({label:'',sub:'',url:'https://'}); renderRows(); setDirty(); };
 
 let NUMS = {};
+const DEFAULT_COPY = {
+  owner: '황미란', role: '미술교사', email: 'miran726@gmail.com', year: 2026,
+  notice: '이 자료를 내려받아 다른 곳에 사용할 때는 저작권에 유의해 주세요.\n· 사용할 때는 제작자(황미란)와 출처를 반드시 밝혀 주세요.\n· 제작자의 허락 없이 자료를 그대로 다시 배포하거나 판매하지 마세요.\n· 슬라이드 속 도판·기사·이미지는 각 원저작자의 것입니다. 각 장의 출처 링크를 확인하고 이용 조건을 따라 주세요.\n· 수정해서 쓰거나 궁금한 점이 있으면 아래 연락처로 문의해 주세요.'
+};
 /* 번호는 저장된 파일 번호가 아니라 "보기 화면에서 보이는 순서"로 매번 새로 매긴다.
    삭제·숨김이 바뀌면 아래 refreshNumbers()가 모든 카드의 번호를 다시 계산한다. */
 function renderSlides(){
@@ -261,7 +279,7 @@ function refreshNumbers(){
     d.querySelector('.pos').textContent = vis ? pos+'번' : '숨김';
     d.querySelector('.pos').title = `파일 ${String(n).padStart(2,'0')}.webp`;
     const pn=d.querySelector('.pn'), nm=NUMS[n];
-    if(nm && vis){ pn.style.display='flex'; pn.style.background=nm.bg; pn.style.color=nm.fg; pn.textContent=pos; } else pn.style.display='none';
+    if(nm){ pn.style.display='block'; pn.style.background=nm.bg; pn.textContent=''; } else pn.style.display='none';   // 보기 화면과 같게: 옛 번호는 가리기만
   });
   $('scount').textContent = `슬라이드 ${total}장 · 보기 화면 ${pos}장 + 마지막 안내 2장 = ${pos+2}장`;
 }
@@ -295,6 +313,8 @@ function validate(){
   C.apps.rows.forEach(r=>{ if(!r.label.trim()) bad.push('이름이 빈 항목이 있습니다'); if(!/^https?:\/\//i.test(r.url)) bad.push(`"${r.label||'(이름 없음)'}" 주소가 http(s)로 시작하지 않습니다`); });
   if(C.apps.moreUrl && !/^https?:\/\//i.test(C.apps.moreUrl)) bad.push('안내 상자 주소가 http(s)로 시작하지 않습니다');
   if(!/^https?:\/\//i.test(C.act.sheet)) bad.push('시트 주소가 http(s)로 시작하지 않습니다');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(C.copyright.email||'')) bad.push('저작권 문구의 메일 주소 형식이 올바르지 않습니다');
+  if(!(C.copyright.owner||'').trim()) bad.push('저작권 문구의 제작자 이름이 비어 있습니다');
   return [...new Set(bad)];
 }
 async function saveContent(msg='관리자: 내용 수정'){

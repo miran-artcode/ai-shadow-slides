@@ -57,8 +57,6 @@
   #bar button { background:transparent; color:var(--fg); border:1px solid #333a42; border-radius:8px;
     height:36px; min-width:40px; padding:0 10px; font-size:15px; cursor:pointer; }
   #bar button:hover { background:#262b31; }
-  #counter { font-variant-numeric:tabular-nums; color:var(--muted); font-size:14px; min-width:72px; text-align:center; }
-  #counter input { width:44px; background:transparent; color:var(--fg); border:none; text-align:right; font:inherit; }
   #progress { flex:1; height:4px; background:#2a2f36; border-radius:2px; overflow:hidden; cursor:pointer; }
   #progress div { height:100%; background:var(--accent); width:0; transition:width .2s; }
   #grid { position:fixed; inset:0 0 56px 0; background:var(--bg); overflow-y:auto; padding:16px;
@@ -67,7 +65,18 @@
   #grid figure { margin:0; cursor:pointer; position:relative; }
   #grid img { width:100%; aspect-ratio:16/9; display:block; border-radius:4px; border:2px solid transparent; background:#222; }
   #grid figure.current img { border-color:var(--accent); }
-  #grid figcaption { position:absolute; left:6px; bottom:6px; background:rgba(0,0,0,.65); font-size:12px; padding:1px 6px; border-radius:4px; }
+  #dlModal { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; padding:16px; }
+  #dlModal.open { display:flex; }
+  #dlModal .box { background:#1b1f24; color:var(--fg); border:1px solid #333a42; border-radius:14px; width:min(560px,100%); max-height:100%; overflow:auto; padding:22px 24px; }
+  #dlModal h3 { margin:0 0 12px; font-size:18px; }
+  #dlModal .notice { background:#14171b; border:1px solid #2d333a; border-left:3px solid var(--accent); border-radius:8px; padding:12px 14px; font-size:13.5px; line-height:1.7; white-space:pre-line; color:#d6d9de; }
+  #dlModal .who { margin:12px 0 0; font-size:13.5px; color:var(--muted); }
+  #dlModal .who a { color:#8ab4f8; }
+  #dlModal .acts { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+  #dlModal .acts button { height:38px; padding:0 16px; border-radius:8px; border:1px solid #333a42; background:transparent; color:var(--fg); font-size:14px; cursor:pointer; }
+  #dlModal .acts button.go { background:var(--accent); border-color:var(--accent); color:#111; font-weight:700; }
+  #dlModal .acts button:disabled { opacity:.55; cursor:progress; }
+  #dlStatus { font-size:13px; color:var(--muted); margin-right:auto; }
   .hide-sm { }
   @media (max-width:560px) { .hide-sm { display:none; } #bar { padding:0 8px; gap:6px; } }
 </style>
@@ -82,11 +91,19 @@
   </div>
 </div>
 <div id="grid" aria-label="슬라이드 목록"></div>
+<div id="dlModal" role="dialog" aria-modal="true" aria-labelledby="dlTitle">
+  <div class="box">
+    <h3 id="dlTitle">강의 슬라이드 내려받기 (PDF)</h3>
+    <div class="notice" id="dlNotice"></div>
+    <p class="who" id="dlWho"></p>
+    <div class="acts"><span id="dlStatus"></span><button id="dlClose">닫기</button><button id="dlGo" class="go">PDF 내려받기</button></div>
+  </div>
+</div>
 <div id="bar">
   <button id="prev" title="이전 (←)">‹</button>
-  <span id="counter"><input id="num" inputmode="numeric" aria-label="슬라이드 번호"> / <span id="total"></span></span>
   <button id="next" title="다음 (→)">›</button>
   <div id="progress"><div></div></div>
+  <button id="dlBtn" title="내려받기 (PDF)" aria-label="내려받기">⤓</button>
   <button id="gridBtn" title="전체 보기 (G)">▦</button>
   <button id="fsBtn" class="hide-sm" title="전체 화면 (F)">⛶</button>
 </div>
@@ -95,7 +112,7 @@ const IMG_COUNT = 123;
 const DEFAULT_CONTENT = {hidden:[],deleted:[],rev:{},apps:{titlePre:"제가 만든 ",titleEm:"웹 앱 모음",rows:[],moreLabel:"",moreUrl:""},act:{eyebrow:"",line1:"",line2:"",desc:"",button:"열기 ↗",sheet:"",qrCaption:""}};
 let C = DEFAULT_CONTENT, LINKS = [], NUMS = {}, PAGES = [], cur = 1;
 const $ = id => document.getElementById(id);
-const img = $('slide'), num = $('num'), grid = $('grid'), bar = $('progress').firstElementChild;
+const img = $('slide'), grid = $('grid'), bar = $('progress').firstElementChild;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safe = u => /^https?:\/\//i.test(u) ? u : '#';
 const host = u => String(u).replace(/^https?:\/\//i,'').replace(/\/$/,'');
@@ -108,22 +125,19 @@ function buildPages(){
   PAGES = [];
   for(let n=1;n<=IMG_COUNT;n++) if(!hidden.has(n)) PAGES.push({t:'img', n});
   PAGES.push({t:'apps'}, {t:'act'});
-  $('total').textContent = PAGES.length;
 }
 function renderEnd(){
   const a = C.apps, t = C.act;
   const top = '<div class="top">AIEDAP 마스터교원 신규연수</div>';
-  const pos = i => PAGES.length - 1 + i;
   $('endApps').innerHTML = top + `<div class="card"><h2>${esc(a.titlePre)}<span>${esc(a.titleEm)}</span></h2><div class="rule"></div>
     <ul style="grid-template-rows:repeat(${Math.max(1,Math.ceil((a.rows||[]).length/2))},auto)">${(a.rows||[]).map(r =>
       `<li><b>${esc(r.label)}${r.sub?`<small>${esc(r.sub)}</small>`:''}</b><a href="${esc(safe(r.url))}" target="_blank" rel="noopener">${esc(host(r.url))}</a></li>`).join('')}</ul>
-    ${a.moreUrl ? `<div class="more">${esc(a.moreLabel)} <a href="${esc(safe(a.moreUrl))}" target="_blank" rel="noopener">${esc(host(a.moreUrl))}</a></div>` : ''}</div>
-    <div class="foot">${pos(0)}</div>`;
+    ${a.moreUrl ? `<div class="more">${esc(a.moreLabel)} <a href="${esc(safe(a.moreUrl))}" target="_blank" rel="noopener">${esc(host(a.moreUrl))}</a></div>` : ''}</div>`;
   $('endAct').innerHTML = top + `<div class="card"><div class="actwrap"><div>
     <p class="eyebrow">${esc(t.eyebrow)}</p><h2>${esc(t.line1)}<br><span>${esc(t.line2)}</span></h2><div class="rule"></div>
     <p class="desc">${esc(t.desc).replace(/\n/g,'<br>')}</p>
     <a class="btn" href="${esc(safe(t.sheet))}" target="_blank" rel="noopener">${esc(t.button)}</a></div>
-    <div class="qrbox"><div id="qr"></div><p>${esc(t.qrCaption)}</p></div></div></div><div class="foot">${pos(1)}</div>`;
+    <div class="qrbox"><div id="qr"></div><p>${esc(t.qrCaption)}</p></div></div></div>`;
   try { new QRCode($('qr'), { text:t.sheet, width:512, height:512, correctLevel:QRCode.CorrectLevel.M }); } catch(e) {}
 }
 function renderGrid(){
@@ -131,8 +145,8 @@ function renderGrid(){
   PAGES.forEach((p,i) => {
     const f = document.createElement('figure');
     f.innerHTML = p.t==='img'
-      ? `<img loading="lazy" src="${src(p.n)}" alt="슬라이드 ${i+1}"><figcaption>${i+1}</figcaption>`
-      : `<div class="endthumb">${p.t==='apps'?'웹 앱 모음':'AI 윤리 원칙 세우기'}</div><figcaption>${i+1}</figcaption>`;
+      ? `<img loading="lazy" src="${src(p.n)}" alt="슬라이드 ${i+1}">`
+      : `<div class="endthumb">${p.t==='apps'?'웹 앱 모음':'AI 윤리 원칙 세우기'}</div>`;
     f.onclick = () => { go(i+1); toggleGrid(false); };
     grid.appendChild(f);
   });
@@ -157,11 +171,11 @@ function go(n, push=true){
   $('endAct').classList.toggle('show', p.t==='act');
   img.style.visibility = p.t==='img' ? '' : 'hidden';
   if(p.t==='img'){ img.src = src(p.n); img.alt = `슬라이드 ${n}`; }
-  num.value = n; bar.style.width = (n/T*100)+'%';
+  bar.style.width = (n/T*100)+'%';
+  // 그림에 찍힌 옛 번호는 배경색으로 덮어 가리기만 한다(새 번호는 그리지 않음)
   const pn = $('pnum'), nm = p.t==='img' ? NUMS[p.n] : null;
-  if(nm){ pn.style.display='flex'; pn.style.background=nm.bg; pn.style.color=nm.fg; pn.textContent=n; } else pn.style.display='none';
+  if(nm){ pn.style.display='block'; pn.style.background=nm.bg; } else pn.style.display='none';
   renderLinks();
-  if(push) history.replaceState(null,'','#'+n);
   preload(PAGES[n]); preload(PAGES[n+1]); preload(PAGES[n-2]);
   grid.querySelectorAll('figure.current').forEach(f=>f.classList.remove('current'));
   grid.children[n-1]?.classList.add('current');
@@ -181,9 +195,8 @@ document.querySelector('.nav-zone.left').onclick=()=>go(cur-1);
 document.querySelector('.nav-zone.right').onclick=()=>go(cur+1);
 $('gridBtn').onclick=()=>toggleGrid(); $('fsBtn').onclick=fullscreen;
 $('progress').onclick=e=>{ const r=e.currentTarget.getBoundingClientRect(); go(Math.ceil((e.clientX-r.left)/r.width*PAGES.length)); };
-num.onchange=()=>{ go(parseInt(num.value)); num.blur(); };
 document.addEventListener('keydown',e=>{
-  if(e.target===num) return;
+  if($('dlModal').classList.contains('open')){ if(e.key==='Escape') closeDl(); return; }
   const k=e.key;
   if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(k)){ e.preventDefault(); go(cur+1); }
   else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(k)){ e.preventDefault(); go(cur-1); }
@@ -199,6 +212,115 @@ $('stage').addEventListener('touchend',e=>{
 });
 window.addEventListener('hashchange',()=>go(parseInt(location.hash.slice(1)),false));
 
+/* ---------- 내려받기(PDF) + 저작권 안내 ---------- */
+const DEFAULT_COPY = {
+  owner: '황미란', role: '미술교사', email: 'miran726@gmail.com', year: 2026,
+  notice: '이 자료를 내려받아 다른 곳에 사용할 때는 저작권에 유의해 주세요.\n' +
+          '· 사용할 때는 제작자(황미란)와 출처를 반드시 밝혀 주세요.\n' +
+          '· 제작자의 허락 없이 자료를 그대로 다시 배포하거나 판매하지 마세요.\n' +
+          '· 슬라이드 속 도판·기사·이미지는 각 원저작자의 것입니다. 각 장의 출처 링크를 확인하고 이용 조건을 따라 주세요.\n' +
+          '· 수정해서 쓰거나 궁금한 점이 있으면 아래 연락처로 문의해 주세요.'
+};
+const copy = () => ({ ...DEFAULT_COPY, ...(C.copyright || {}) });
+const creditLine = () => { const c = copy(); return `© ${c.year} ${c.role} ${c.owner} · ${c.email} · 사용 시 저작권 유의 · 출처 표기`; };
+const FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+let dlBusy = false;
+
+function openDl(){
+  const c = copy();
+  $('dlNotice').textContent = c.notice;
+  $('dlWho').innerHTML = `${esc(c.role)} <b>${esc(c.owner)}</b> · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`;
+  $('dlStatus').textContent = '';
+  $('dlModal').classList.add('open');
+}
+function closeDl(){ if(!dlBusy) $('dlModal').classList.remove('open'); }
+const loadImg = url => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('이미지를 불러오지 못했습니다: ' + url)); i.src = url; });
+// 화면 갱신용 양보. setTimeout은 숨은 탭에서 1초씩 늦춰지므로 MessageChannel을 쓴다.
+const tick = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
+
+/* 슬라이드 한 장에 (1) 그림 속 옛 번호 가리기 (2) 저작권 한 줄 새기기 */
+function stampSlide(cx, n){
+  const nm = NUMS[n];
+  if(nm){ cx.fillStyle = nm.bg; cx.fillRect(1706, 1018, 120, 50); }
+  const p = cx.getImageData(1500, 1030, 60, 28).data; let lum = 0;
+  for(let i = 0; i < p.length; i += 4) lum += (0.299*p[i] + 0.587*p[i+1] + 0.114*p[i+2]) / 255;
+  lum /= p.length / 4;
+  cx.fillStyle = lum > 0.55 ? '#003c82' : '#ffffff';
+  cx.textAlign = 'right'; cx.textBaseline = 'middle';
+  let size = 19; cx.font = `600 ${size}px ${FONT}`;
+  const text = creditLine();
+  while(cx.measureText(text).width > 820 && size > 12){ size--; cx.font = `600 ${size}px ${FONT}`; }
+  cx.globalAlpha = 0.92; cx.fillText(text, 1824, 1044); cx.globalAlpha = 1;
+}
+function wrapText(cx, text, maxW){
+  const lines = [];
+  for(const para of String(text).split('\n')){
+    let line = '';
+    for(const word of para.split(' ')){                       // 단어(띄어쓰기) 단위로 줄을 바꾼다
+      const t = line ? line + ' ' + word : word;
+      if(cx.measureText(t).width <= maxW){ line = t; continue; }
+      if(line){ lines.push(line); line = ''; }
+      let part = '';                                          // 한 단어가 한 줄보다 길면 글자 단위
+      for(const ch of word){ if(cx.measureText(part + ch).width > maxW && part){ lines.push(part); part = ch; } else part += ch; }
+      line = part;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+function roundRect(cx, x, y, w, h, r){ cx.beginPath(); cx.moveTo(x+r, y); cx.arcTo(x+w, y, x+w, y+h, r); cx.arcTo(x+w, y+h, x, y+h, r); cx.arcTo(x, y+h, x, y, r); cx.arcTo(x, y, x+w, y, r); cx.closePath(); }
+/* 마지막 장: 저작권 및 이용 안내 (덱 디자인에 맞춤) */
+function drawNoticePage(cx){
+  const c = copy();
+  cx.fillStyle = '#e7e7e7'; cx.fillRect(0, 0, 1920, 560); cx.fillStyle = '#9fc5e8'; cx.fillRect(0, 560, 1920, 520);
+  cx.fillStyle = '#0b4a9e'; cx.font = `700 26px ${FONT}`; cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+  cx.fillText('AIEDAP 마스터교원 신규연수', 93, 52);
+  cx.fillStyle = '#fff'; roundRect(cx, 83, 93, 1754, 920, 40); cx.fill();
+  cx.fillStyle = '#1a1a1a'; cx.font = `700 58px ${FONT}`; cx.fillText('저작권 및 이용 안내', 150, 210);
+  cx.fillStyle = '#f0a020'; cx.fillRect(150, 240, 130, 7);
+  cx.fillStyle = '#333'; let size = 31; let lines;
+  do { cx.font = `400 ${size}px ${FONT}`; lines = wrapText(cx, c.notice, 1560); size--; } while(lines.length * (size + 22) > 480 && size > 18);
+  const lh = size + 22; lines.forEach((l, i) => cx.fillText(l, 150, 320 + i * lh));
+  cx.fillStyle = '#fff4e0'; roundRect(cx, 150, 810, 1620, 150, 22); cx.fill();
+  cx.fillStyle = '#6b4a00'; cx.font = `400 28px ${FONT}`; cx.fillText(`제작  ${c.role} ${c.owner}`, 190, 868);
+  cx.fillStyle = '#0b4a9e'; cx.font = `700 44px ${FONT}`; cx.fillText(c.email, 190, 930);
+  cx.fillStyle = '#0b4a9e'; cx.font = `700 24px ${FONT}`; cx.textAlign = 'right'; cx.fillText(`© ${c.year} ${c.owner}`, 1790, 996); cx.textAlign = 'left';
+}
+async function buildPdf(onProgress){
+  if(!window.jspdf) throw new Error('PDF 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+  const { jsPDF } = window.jspdf;
+  const slides = PAGES.filter(p => p.t === 'img'), total = slides.length + 1;
+  const doc = new jsPDF({ unit:'px', format:[1920,1080], orientation:'landscape', compress:true, hotfixes:['px_scaling'] });
+  const cv = document.createElement('canvas'); cv.width = 1920; cv.height = 1080;
+  const cx = cv.getContext('2d', { willReadFrequently:true });
+  for(let i = 0; i < slides.length; i++){
+    const im = await loadImg(src(slides[i].n));
+    cx.globalAlpha = 1; cx.drawImage(im, 0, 0, 1920, 1080); stampSlide(cx, slides[i].n);
+    if(i > 0) doc.addPage([1920,1080], 'landscape');
+    doc.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 1920, 1080, undefined, 'FAST');
+    onProgress(i + 1, total); await tick();
+  }
+  cx.clearRect(0, 0, 1920, 1080); drawNoticePage(cx);
+  doc.addPage([1920,1080], 'landscape'); doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 1920, 1080, undefined, 'FAST');
+  onProgress(total, total);
+  const c = copy();
+  doc.setProperties({ title:'AI Shadow - AIEDAP lecture slides', author:'Miran Hwang', creator:'AI Shadow slide viewer',
+    subject:`(c) ${c.year} Miran Hwang <${c.email}>. Please observe copyright and credit the author when reusing.`, keywords:'copyright, credit required' });
+  return doc;
+}
+async function runDl(){
+  if(dlBusy) return; dlBusy = true;
+  const go = $('dlGo'), st = $('dlStatus'); go.disabled = true; $('dlClose').disabled = true;
+  try {
+    const doc = await buildPdf((i, t) => { st.textContent = `PDF 만드는 중… ${Math.round(i / t * 100)}%`; });
+    doc.save(`AI의그림자_강의슬라이드_${copy().owner}.pdf`);
+    st.textContent = '내려받기를 시작했습니다. 파일 마지막 장에 저작권 안내가 들어 있습니다.';
+  } catch(e){ st.textContent = '만들지 못했습니다: ' + e.message; }
+  dlBusy = false; go.disabled = false; $('dlClose').disabled = false;
+}
+$('dlBtn').onclick = openDl; $('dlClose').onclick = closeDl; $('dlGo').onclick = runDl;
+$('dlModal').addEventListener('click', e => { if(e.target === $('dlModal')) closeDl(); });
+
 async function start(){
   try { const r = await fetch('content.json?t='+Date.now(), {cache:'no-store'}); if(r.ok) C = Object.assign({}, DEFAULT_CONTENT, await r.json()); } catch(e) {}
   try { const r = await fetch('links.json'); if(r.ok) LINKS = await r.json(); } catch(e) {}
@@ -209,5 +331,6 @@ async function start(){
 window.addEventListener('load', start);   // QR 라이브러리까지 불러온 뒤 시작
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
 </html>
