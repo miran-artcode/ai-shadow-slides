@@ -1,0 +1,32 @@
+{
+  "hidden": [],
+  "rev": {},
+  "apps": {
+    "titlePre": "제가 만든 ",
+    "titleEm": "웹 앱 모음",
+    "rows": [
+      { "label": "세특 특강", "sub": "", "url": "https://admission-20260710.web.app/" },
+      { "label": "생성형 AI 수업", "sub": "2026-2학기 · 한국교육과정평가원", "url": "https://class-9f074.web.app/" },
+      { "label": "미대입시", "sub": "", "url": "https://admission2028art.web.app/" },
+      { "label": "수학여행", "sub": "", "url": "https://momentarchive-92831.web.app/" },
+      { "label": "연수용 앱", "sub": "", "url": "https://keris-data.web.app/" },
+      { "label": "교장선생님 연수", "sub": "", "url": "https://seoul-20260716.web.app/" },
+      { "label": "바이브코딩", "sub": "", "url": "https://20260619-1.netlify.app/" },
+      { "label": "바이브코딩", "sub": "", "url": "https://20260619-2.netlify.app/" },
+      { "label": "바이브코딩", "sub": "", "url": "https://vibecoding103.web.app/" },
+      { "label": "미술 데이터", "sub": "", "url": "https://lab-datacanvas.web.app/" },
+      { "label": "수업 KERIS", "sub": "", "url": "https://ai-design-art.web.app/" }
+    ],
+    "moreLabel": "저에게 더 궁금하다면 →",
+    "moreUrl": "https://miran-hwang.web.app/"
+  },
+  "act": {
+    "eyebrow": "함께 작성하기",
+    "line1": "우리 교과목의",
+    "line2": "AI 윤리 원칙 세우기",
+    "desc": "오늘 토론에서 끝내 답하지 못한 질문을 떠올리며,\n우리 교과목에 맞는 AI 윤리 원칙을 시트에 적어 주세요.",
+    "button": "활동 시트 열기 ↗",
+    "sheet": "https://docs.google.com/spreadsheets/d/1PrVN98T5tldfjfXZkKKAIxWvt0SsodHQirtY9iDSj8g/edit?usp=sharing",
+    "qrCaption": "휴대폰 카메라로 스캔"
+  }
+}

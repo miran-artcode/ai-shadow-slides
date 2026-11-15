@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>슬라이드 관리자</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1a1d21; --muted:#6b7280; --line:#e2e5ea; --blue:#0b4a9e; --accent:#f0a020; --danger:#c0392b; --ok:#1e8e3e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171b; --card:#1d2126; --ink:#e8eaed; --muted:#9aa0a6; --line:#2d333a; --blue:#6ea8ff; --danger:#ff7b6e; --ok:#5fd37a; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.6 -apple-system,"Segoe UI","Malgun Gothic",sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--card); border-bottom:1px solid var(--line); padding:10px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; margin-right:auto; }
+  main { max-width:1100px; margin:0 auto; padding:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  a { color:var(--blue); }
+  h2 { font-size:16px; margin:0 0 12px; }
+  h3 { font-size:14px; margin:18px 0 8px; color:var(--muted); }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input[type=text], input[type=password], input[type=url], textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; }
+  textarea { min-height:70px; resize:vertical; }
+  button { font:inherit; cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:8px; padding:7px 14px; }
+  button:hover { border-color:var(--blue); }
+  button.primary { background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700; }
+  button.danger { color:var(--danger); border-color:var(--danger); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .tabs { display:flex; gap:6px; margin-bottom:16px; }
+  .tabs button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .row { display:grid; grid-template-columns:1.1fr 1.2fr 2fr auto; gap:8px; align-items:center; margin-bottom:8px; }
+  .row .mini { display:flex; gap:4px; }
+  .row .mini button { padding:6px 9px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .note { font-size:13px; color:var(--muted); }
+  .warn { background:#fff4e0; color:#6b4a00; border:1px solid #f0d9a8; border-radius:8px; padding:10px 14px; font-size:13px; margin:10px 0; }
+  @media (prefers-color-scheme: dark) { .warn { background:#33290f; color:#f1d9a0; border-color:#5a4713; } }
+  #status { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#222; color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; display:none; z-index:30; max-width:90vw; }
+  #status.err { background:var(--danger); } #status.ok { background:var(--ok); }
+  #sgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .sc { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--card); }
+  .sc.hid img { opacity:.25; }
+  .sc img { width:100%; aspect-ratio:16/9; display:block; background:#ddd; object-fit:cover; }
+  .sc .bar { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; font-size:13px; gap:6px; }
+  .sc .bar button { padding:3px 8px; font-size:12px; }
+  .sc label { margin:0; display:flex; gap:4px; align-items:center; color:var(--ink); }
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:20; display:none; flex-direction:column; align-items:center; padding:14px; gap:10px; }
+  #modal.open { display:flex; }
+  #cbox { position:relative; max-width:100%; max-height:calc(100vh - 130px); aspect-ratio:16/9; height:calc(100vh - 130px); touch-action:none; cursor:crosshair; user-select:none; }
+  #cbox img { width:100%; height:100%; display:block; pointer-events:none; }
+  #cbox .bx { position:absolute; background:rgba(0,0,0,.72); outline:2px solid #ff4d4d; }
+  #mctl { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; color:#fff; }
+  #mctl .note { color:#ddd; }
+  #loginHelp { font-size:13px; }
+  #loginHelp li { margin-bottom:4px; }
+  code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:12px; }
+  @media (max-width:700px) { .row { grid-template-columns:1fr; } .two { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>슬라이드 관리자</h1>
+  <span id="who" class="note"></span>
+  <a href="./" target="_blank" rel="noopener" style="font-size:13px">슬라이드 보기 ↗</a>
+  <button id="logout" style="display:none">로그아웃</button>
+</header>
+<main>
+  <section id="login" class="card">
+    <h2>관리자 로그인</h2>
+    <p class="note">비밀번호 대신 GitHub 토큰으로 인증합니다. 이 저장소에 쓰기 권한이 있는 토큰이 없으면 아무도 저장할 수 없습니다.</p>
+    <ol id="loginHelp">
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub 토큰 만들기</a>를 엽니다.</li>
+      <li><b>Repository access</b>는 <b>Only select repositories</b>를 고르고 <code>ai-shadow-slides</code>만 선택합니다.</li>
+      <li><b>Permissions → Repository permissions → Contents</b>를 <b>Read and write</b>로 설정합니다.</li>
+      <li>만료일은 짧게(예: 30일) 정하고 만든 뒤 나온 토큰을 아래에 붙여 넣습니다.</li>
+    </ol>
+    <label for="tok">토큰</label>
+    <input id="tok" type="password" autocomplete="off" placeholder="github_pat_...">
+    <p class="note">토큰은 이 브라우저 탭의 임시 저장소에만 두고, 탭을 닫으면 지워집니다. 서버로 보내지 않고 GitHub로만 전송합니다.</p>
+    <button id="loginBtn" class="primary">로그인</button>
+  </section>
+
+  <section id="app" style="display:none">
+    <div class="tabs">
+      <button data-tab="text" class="on">마지막 장 편집</button>
+      <button data-tab="slides">슬라이드 관리 · 가리기</button>
+    </div>
+
+    <div id="tab-text">
+      <div class="card">
+        <h2>124번 · 웹 앱 모음</h2>
+        <div class="two">
+          <div><label>제목 앞부분</label><input id="a_pre" type="text"></div>
+          <div><label>제목 강조 부분 (파란색)</label><input id="a_em" type="text"></div>
+        </div>
+        <h3>목록 (이름 · 작은 설명 · 주소)</h3>
+        <div id="rows"></div>
+        <button id="addRow">+ 항목 추가</button>
+        <h3>맨 아래 안내 상자</h3>
+        <div class="two">
+          <div><label>문구</label><input id="a_moreLabel" type="text"></div>
+          <div><label>주소 (비우면 상자 숨김)</label><input id="a_moreUrl" type="url"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>125번 · 활동 시트</h2>
+        <div class="two">
+          <div><label>작은 머리말</label><input id="t_eyebrow" type="text"></div>
+          <div><label>버튼 글자</label><input id="t_button" type="text"></div>
+          <div><label>제목 첫 줄</label><input id="t_line1" type="text"></div>
+          <div><label>제목 둘째 줄 (파란색)</label><input id="t_line2" type="text"></div>
+        </div>
+        <label>안내 문구 (줄바꿈 가능)</label><textarea id="t_desc"></textarea>
+        <div class="two">
+          <div><label>시트 주소 (버튼과 QR 코드에 쓰임)</label><input id="t_sheet" type="url"></div>
+          <div><label>QR 아래 글자</label><input id="t_qrCaption" type="text"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-slides" style="display:none">
+      <div class="card">
+        <h2>슬라이드 123장</h2>
+        <div class="warn">
+          <b>가리기</b>는 그림 위에 검은 상자를 그려 <b>이미지 파일 자체에 새겨 넣습니다</b>. 화면 위에 덮는 방식이 아니라서 원본 파일에서도 사라집니다.<br>
+          다만 GitHub는 이전 버전을 기록으로 남기므로, 이미 공개된 개인정보는 저장소 기록 정리가 따로 필요합니다. 중요한 정보라면 알려 주세요.
+        </div>
+        <p class="note">· <b>숨김</b> 체크: 보기 화면에서 그 장을 건너뜁니다(파일은 남음). · <b>가리기</b>: 마우스로 드래그해 상자를 그린 뒤 적용합니다. 숨김은 맨 위 <b>저장</b>을 눌러야 반영됩니다.</p>
+        <div id="sgrid"></div>
+      </div>
+    </div>
+
+    <div class="card" style="position:sticky; bottom:10px; display:flex; gap:10px; align-items:center; justify-content:space-between;">
+      <span id="dirty" class="note">변경 없음</span>
+      <button id="save" class="primary" disabled>저장하고 사이트에 반영</button>
+    </div>
+  </section>
+</main>
+
+<div id="modal">
+  <div id="cbox"><img id="rimg" alt=""><div id="rboxes"></div></div>
+  <div id="mctl">
+    <span class="note" id="mtitle"></span>
+    <button id="mundo">되돌리기</button>
+    <button id="mclear">모두 지우기</button>
+    <button id="mapply" class="primary">이미지에 적용(영구 저장)</button>
+    <button id="mdel" class="danger">이 장 파일 삭제</button>
+    <button id="mclose">닫기</button>
+  </div>
+</div>
+<div id="status"></div>
+
+<script>
+const REPO = 'miran-artcode/ai-shadow-slides', BRANCH = 'main', TOTAL = 123;
+const $ = id => document.getElementById(id);
+let tok = '', who = null, C = null, dirty = false;
+try { tok = sessionStorage.getItem('gh_tok') || ''; } catch(e) {}
+
+function toast(msg, kind='') { const s=$('status'); s.textContent=msg; s.className=kind; s.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>s.style.display='none', kind==='err'?7000:3500); }
+function b64utf8(str){ return btoa(unescape(encodeURIComponent(str))); }
+function fromB64utf8(b){ return decodeURIComponent(escape(atob(b.replace(/\s/g,'')))); }
+function bytesToB64(buf){ let s='', a=new Uint8Array(buf); for(let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null, a.subarray(i,i+0x8000)); return btoa(s); }
+
+async function gh(path, opts={}) {
+  const url = path.startsWith('http') ? path : `https://api.github.com${path}`;
+  const r = await fetch(url, { ...opts, headers: { 'Authorization':'Bearer '+tok, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json', ...(opts.headers||{}) } });
+  if (!r.ok) { let m=''; try { m=(await r.json()).message; } catch(e) {} throw new Error(`GitHub ${r.status}: ${m||r.statusText}`); }
+  return r.status===204 ? null : r.json();
+}
+const who_email = () => `${who.id}+${who.login}@users.noreply.github.com`;
+const ident = () => ({ name: who.login, email: who_email() });   // 개인 메일이 커밋에 남지 않도록 noreply 주소를 명시
+async function getMeta(path){ return gh(`/repos/${REPO}/contents/${path}?ref=${BRANCH}&t=${Date.now()}`); }
+async function putFile(path, b64, message, sha){
+  const body = { message, content:b64, branch:BRANCH, committer:ident(), author:ident() };
+  if (sha) body.sha = sha;
+  return gh(`/repos/${REPO}/contents/${path}`, { method:'PUT', body:JSON.stringify(body) });
+}
+
+async function login() {
+  tok = $('tok').value.trim() || tok;
+  if (!tok) return toast('토큰을 입력해 주세요','err');
+  $('loginBtn').disabled = true;
+  try {
+    who = await gh('/user');
+    const repo = await gh(`/repos/${REPO}`);
+    if (!repo.permissions || !repo.permissions.push) throw new Error('이 토큰에는 저장소 쓰기 권한이 없습니다. Contents: Read and write를 확인해 주세요.');
+    try { sessionStorage.setItem('gh_tok', tok); } catch(e) {}
+    await loadContent();
+    $('login').style.display='none'; $('app').style.display='block'; $('logout').style.display='';
+    $('who').textContent = who.login + ' 로 로그인됨';
+    renderAll();
+  } catch(e) { tok=''; try{sessionStorage.removeItem('gh_tok');}catch(_){}; toast(e.message,'err'); }
+  $('loginBtn').disabled = false;
+}
+async function loadContent(){
+  const m = await getMeta('content.json');
+  C = JSON.parse(fromB64utf8(m.content));
+  C.hidden = C.hidden || []; C.rev = C.rev || {};
+}
+function logout(){ try{sessionStorage.removeItem('gh_tok');}catch(e){}; tok=''; location.reload(); }
+
+function setDirty(v=true){ dirty=v; $('dirty').textContent = v ? '저장하지 않은 변경이 있습니다' : '변경 없음'; $('save').disabled = !v; }
+function bind(id, get, set){ const el=$(id); el.value = get() ?? ''; el.oninput = () => { set(el.value); setDirty(); }; }
+
+function renderAll(){
+  const a=C.apps, t=C.act;
+  bind('a_pre',()=>a.titlePre,v=>a.titlePre=v); bind('a_em',()=>a.titleEm,v=>a.titleEm=v);
+  bind('a_moreLabel',()=>a.moreLabel,v=>a.moreLabel=v); bind('a_moreUrl',()=>a.moreUrl,v=>a.moreUrl=v);
+  for (const k of ['eyebrow','button','line1','line2','desc','sheet','qrCaption']) bind('t_'+k, ()=>t[k], v=>t[k]=v);
+  renderRows(); renderSlides(); setDirty(false);
+}
+function renderRows(){
+  const box=$('rows'); box.innerHTML='';
+  C.apps.rows.forEach((r,i)=>{
+    const d=document.createElement('div'); d.className='row';
+    d.innerHTML = `<input type="text" placeholder="이름" value="${esc(r.label)}"><input type="text" placeholder="작은 설명(선택)" value="${esc(r.sub)}"><input type="url" placeholder="https://..." value="${esc(r.url)}">
+      <div class="mini"><button title="위로">↑</button><button title="아래로">↓</button><button class="danger" title="삭제">✕</button></div>`;
+    const [l,s,u]=d.querySelectorAll('input'), [up,dn,del]=d.querySelectorAll('button');
+    l.oninput=()=>{r.label=l.value;setDirty();}; s.oninput=()=>{r.sub=s.value;setDirty();}; u.oninput=()=>{r.url=u.value;setDirty();};
+    up.onclick=()=>{ if(i>0){ [C.apps.rows[i-1],C.apps.rows[i]]=[C.apps.rows[i],C.apps.rows[i-1]]; renderRows(); setDirty(); } };
+    dn.onclick=()=>{ if(i<C.apps.rows.length-1){ [C.apps.rows[i+1],C.apps.rows[i]]=[C.apps.rows[i],C.apps.rows[i+1]]; renderRows(); setDirty(); } };
+    del.onclick=()=>{ if(confirm(`"${r.label}" 항목을 삭제할까요?`)){ C.apps.rows.splice(i,1); renderRows(); setDirty(); } };
+    box.appendChild(d);
+  });
+}
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+$('addRow').onclick=()=>{ C.apps.rows.push({label:'',sub:'',url:'https://'}); renderRows(); setDirty(); };
+
+function renderSlides(){
+  const g=$('sgrid'); g.innerHTML='';
+  const hidden=new Set(C.hidden);
+  for(let n=1;n<=TOTAL;n++){
+    const d=document.createElement('div'); d.className='sc'+(hidden.has(n)?' hid':'');
+    const v = C.rev[n] ? '?v='+C.rev[n] : '';
+    d.innerHTML=`<img loading="lazy" src="slides/${String(n).padStart(2,'0')}.webp${v}" alt="${n}"><div class="bar"><b>${n}</b><label><input type="checkbox" ${hidden.has(n)?'checked':''}>숨김</label><button>가리기</button></div>`;
+    d.querySelector('input').onchange=e=>{ const s=new Set(C.hidden); e.target.checked?s.add(n):s.delete(n); C.hidden=[...s].sort((a,b)=>a-b); d.classList.toggle('hid',e.target.checked); setDirty(); };
+    d.querySelector('button').onclick=()=>openRedact(n);
+    g.appendChild(d);
+  }
+}
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  $('tab-text').style.display = b.dataset.tab==='text' ? '' : 'none';
+  $('tab-slides').style.display = b.dataset.tab==='slides' ? '' : 'none';
+});
+
+function validate(){
+  const bad = [];
+  C.apps.rows.forEach(r=>{ if(!r.label.trim()) bad.push('이름이 빈 항목이 있습니다'); if(!/^https?:\/\//i.test(r.url)) bad.push(`"${r.label||'(이름 없음)'}" 주소가 http(s)로 시작하지 않습니다`); });
+  if(C.apps.moreUrl && !/^https?:\/\//i.test(C.apps.moreUrl)) bad.push('안내 상자 주소가 http(s)로 시작하지 않습니다');
+  if(!/^https?:\/\//i.test(C.act.sheet)) bad.push('시트 주소가 http(s)로 시작하지 않습니다');
+  return [...new Set(bad)];
+}
+async function saveContent(msg='관리자: 내용 수정'){
+  const m = await getMeta('content.json');
+  const res = await putFile('content.json', b64utf8(JSON.stringify(C,null,2)+'\n'), msg, m.sha);
+  return res;
+}
+$('save').onclick=async()=>{
+  const bad=validate(); if(bad.length) return toast(bad[0],'err');
+  $('save').disabled=true;
+  try { await saveContent(); setDirty(false); toast('저장했습니다. 사이트 반영까지 1~2분 걸립니다.','ok'); }
+  catch(e){ toast(e.message,'err'); $('save').disabled=false; }
+};
+$('loginBtn').onclick=login; $('logout').onclick=logout;
+$('tok').addEventListener('keydown',e=>{ if(e.key==='Enter') login(); });
+window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+
+/* ---------- 가리기(이미지에 굽기) ---------- */
+let rn=0, boxes=[], drag=null;
+const cbox=$('cbox'), rimg=$('rimg'), rb=$('rboxes');
+function drawBoxes(extra){ rb.innerHTML=''; [...boxes, ...(extra?[extra]:[])].forEach(b=>{ const d=document.createElement('div'); d.className='bx'; Object.assign(d.style,{left:b.x*100+'%',top:b.y*100+'%',width:b.w*100+'%',height:b.h*100+'%'}); rb.appendChild(d); }); }
+function openRedact(n){ rn=n; boxes=[]; $('mtitle').textContent=`${n}번 슬라이드 · 가릴 부분을 드래그하세요`; rimg.src=`slides/${String(n).padStart(2,'0')}.webp?x=${Date.now()}`; drawBoxes(); $('modal').classList.add('open'); }
+const pt = e => { const r=cbox.getBoundingClientRect(); return { x:Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)), y:Math.min(1,Math.max(0,(e.clientY-r.top)/r.height)) }; };
+cbox.addEventListener('pointerdown',e=>{ cbox.setPointerCapture(e.pointerId); drag=pt(e); });
+cbox.addEventListener('pointermove',e=>{ if(!drag) return; const p=pt(e); drawBoxes({x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}); });
+cbox.addEventListener('pointerup',e=>{ if(!drag) return; const p=pt(e), b={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}; drag=null; if(b.w>0.004&&b.h>0.006) boxes.push(b); drawBoxes(); });
+$('mundo').onclick=()=>{ boxes.pop(); drawBoxes(); };
+$('mclear').onclick=()=>{ boxes=[]; drawBoxes(); };
+$('mclose').onclick=()=>$('modal').classList.remove('open');
+$('mapply').onclick=async()=>{
+  if(!boxes.length) return toast('가릴 부분을 먼저 드래그해 주세요','err');
+  if(!confirm(`${rn}번 슬라이드 이미지에 검은 상자 ${boxes.length}개를 새겨 넣습니다. 되돌릴 수 없습니다(저장소 기록 제외). 진행할까요?`)) return;
+  $('mapply').disabled=true;
+  try {
+    const cv=document.createElement('canvas'); cv.width=rimg.naturalWidth; cv.height=rimg.naturalHeight;
+    const cx=cv.getContext('2d'); cx.drawImage(rimg,0,0); cx.fillStyle='#000';
+    const pad=0.004; boxes.forEach(b=>cx.fillRect((b.x-pad)*cv.width,(b.y-pad)*cv.height,(b.w+2*pad)*cv.width,(b.h+2*pad)*cv.height));
+    const blob=await new Promise(r=>cv.toBlob(r,'image/webp',0.92));
+    const path=`slides/${String(rn).padStart(2,'0')}.webp`;
+    const meta=await getMeta(path);
+    await putFile(path, bytesToB64(await blob.arrayBuffer()), `관리자: ${rn}번 슬라이드 일부 가림`, meta.sha);
+    C.rev[rn]=Date.now(); await saveContent(`관리자: ${rn}번 슬라이드 갱신 표시`);
+    toast('이미지에 적용했습니다. 사이트 반영까지 1~2분 걸립니다.','ok');
+    $('modal').classList.remove('open'); renderSlides();
+  } catch(e){ toast(e.message,'err'); }
+  $('mapply').disabled=false;
+};
+$('mdel').onclick=async()=>{
+  if(!confirm(`${rn}번 슬라이드 이미지 파일을 저장소에서 삭제합니다. 복구하려면 저장소 기록에서 꺼내야 합니다. 진행할까요?`)) return;
+  try {
+    const path=`slides/${String(rn).padStart(2,'0')}.webp`, meta=await getMeta(path);
+    await gh(`/repos/${REPO}/contents/${path}`,{method:'DELETE',body:JSON.stringify({message:`관리자: ${rn}번 슬라이드 삭제`,sha:meta.sha,branch:BRANCH,committer:ident(),author:ident()})});
+    if(!C.hidden.includes(rn)) C.hidden=[...C.hidden,rn].sort((a,b)=>a-b);
+    await saveContent(`관리자: ${rn}번 슬라이드 숨김 처리`);
+    toast('삭제했고 보기 화면에서도 건너뜁니다.','ok'); $('modal').classList.remove('open'); renderSlides();
+  } catch(e){ toast(e.message,'err'); }
+};
+
+if (tok) login();
+</script>
+</body>
+</html>
