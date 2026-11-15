@@ -38,9 +38,14 @@
   #status.err { background:var(--danger); } #status.ok { background:var(--ok); }
   #sgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
   .sc { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--card); }
-  .sc.hid img { opacity:.25; }
+  .sc.hid .thumb img { opacity:.25; }
+  .sc .thumb { position:relative; container-type:inline-size; }
   .sc img { width:100%; aspect-ratio:16/9; display:block; background:#ddd; object-fit:cover; }
-  .sc .bar { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; font-size:13px; gap:6px; }
+  .sc .pn { position:absolute; left:88.889%; top:94.321%; width:6.111%; height:4.444%; display:none; align-items:center; justify-content:flex-end; font:700 1.25cqw/1 "Malgun Gothic",sans-serif; }
+  .sc .bar { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; font-size:13px; gap:6px; flex-wrap:wrap; }
+  .sc .bar .pos { min-width:34px; }
+  .sc.hid .bar .pos { color:var(--muted); font-weight:400; }
+  .sc .btns { display:flex; gap:4px; }
   .sc .bar button { padding:3px 8px; font-size:12px; }
   .sc label { margin:0; display:flex; gap:4px; align-items:center; color:var(--ink); }
   #modal { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:20; display:none; flex-direction:column; align-items:center; padding:14px; gap:10px; }
@@ -119,12 +124,15 @@
 
     <div id="tab-slides" style="display:none">
       <div class="card">
-        <h2>슬라이드 123장</h2>
+        <h2 id="scount">슬라이드</h2>
         <div class="warn">
           <b>가리기</b>는 그림 위에 검은 상자를 그려 <b>이미지 파일 자체에 새겨 넣습니다</b>. 화면 위에 덮는 방식이 아니라서 원본 파일에서도 사라집니다.<br>
           다만 GitHub는 이전 버전을 기록으로 남기므로, 이미 공개된 개인정보는 저장소 기록 정리가 따로 필요합니다. 중요한 정보라면 알려 주세요.
         </div>
-        <p class="note">· <b>숨김</b> 체크: 보기 화면에서 그 장을 건너뜁니다(파일은 남음). · <b>가리기</b>: 마우스로 드래그해 상자를 그린 뒤 적용합니다. 숨김은 맨 위 <b>저장</b>을 눌러야 반영됩니다.</p>
+        <p class="note">· <b>번호</b>: 보기 화면에 나오는 순서로 <b>매번 새로 매겨집니다</b>. 삭제·숨김을 하면 뒤쪽 번호가 바로 앞당겨지고, 슬라이드 그림 속 번호도 이 번호로 바뀌어 보입니다.<br>
+        · <b>숨김</b> 체크: 보기 화면에서 그 장을 건너뜁니다(파일은 남음). 아래쪽 <b>저장</b>을 눌러야 반영됩니다.<br>
+        · <b>가리기</b>: 마우스로 드래그해 상자를 그린 뒤 이미지에 적용합니다.<br>
+        · <b>삭제</b>: 이미지 파일을 저장소에서 지웁니다. 누르는 즉시 반영됩니다(저장 버튼 불필요).</p>
         <div id="sgrid"></div>
       </div>
     </div>
@@ -194,7 +202,8 @@ async function login() {
 async function loadContent(){
   const m = await getMeta('content.json');
   C = JSON.parse(fromB64utf8(m.content));
-  C.hidden = C.hidden || []; C.rev = C.rev || {};
+  C.hidden = C.hidden || []; C.deleted = C.deleted || []; C.rev = C.rev || {};
+  try { const r = await fetch('numbers.json'); if(r.ok) NUMS = await r.json(); } catch(e) {}
 }
 function logout(){ try{sessionStorage.removeItem('gh_tok');}catch(e){}; tok=''; location.reload(); }
 
@@ -225,17 +234,54 @@ function renderRows(){
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('addRow').onclick=()=>{ C.apps.rows.push({label:'',sub:'',url:'https://'}); renderRows(); setDirty(); };
 
+let NUMS = {};
+/* 번호는 저장된 파일 번호가 아니라 "보기 화면에서 보이는 순서"로 매번 새로 매긴다.
+   삭제·숨김이 바뀌면 아래 refreshNumbers()가 모든 카드의 번호를 다시 계산한다. */
 function renderSlides(){
   const g=$('sgrid'); g.innerHTML='';
-  const hidden=new Set(C.hidden);
+  const deleted=new Set(C.deleted), hidden=new Set(C.hidden);
   for(let n=1;n<=TOTAL;n++){
-    const d=document.createElement('div'); d.className='sc'+(hidden.has(n)?' hid':'');
+    if(deleted.has(n)) continue;
+    const d=document.createElement('div'); d.dataset.n=n; d.className='sc'+(hidden.has(n)?' hid':'');
     const v = C.rev[n] ? '?v='+C.rev[n] : '';
-    d.innerHTML=`<img loading="lazy" src="slides/${String(n).padStart(2,'0')}.webp${v}" alt="${n}"><div class="bar"><b>${n}</b><label><input type="checkbox" ${hidden.has(n)?'checked':''}>숨김</label><button>가리기</button></div>`;
-    d.querySelector('input').onchange=e=>{ const s=new Set(C.hidden); e.target.checked?s.add(n):s.delete(n); C.hidden=[...s].sort((a,b)=>a-b); d.classList.toggle('hid',e.target.checked); setDirty(); };
-    d.querySelector('button').onclick=()=>openRedact(n);
+    d.innerHTML=`<div class="thumb"><img loading="lazy" src="slides/${String(n).padStart(2,'0')}.webp${v}" alt="파일 ${n}"><span class="pn"></span></div>
+      <div class="bar"><b class="pos"></b><label><input type="checkbox" ${hidden.has(n)?'checked':''}>숨김</label><span class="btns"><button class="red">가리기</button><button class="dl danger">삭제</button></span></div>`;
+    d.querySelector('input').onchange=e=>{ const s=new Set(C.hidden); e.target.checked?s.add(n):s.delete(n); C.hidden=[...s].sort((a,b)=>a-b); d.classList.toggle('hid',e.target.checked); refreshNumbers(); setDirty(); };
+    d.querySelector('.red').onclick=()=>openRedact(n);
+    d.querySelector('.dl').onclick=()=>deleteSlide(n);
     g.appendChild(d);
   }
+  refreshNumbers();
+}
+function refreshNumbers(){
+  const hidden=new Set(C.hidden); let pos=0, total=0;
+  document.querySelectorAll('#sgrid .sc').forEach(d=>{
+    const n=+d.dataset.n, vis=!hidden.has(n); total++;
+    if(vis) pos++;
+    d.querySelector('.pos').textContent = vis ? pos+'번' : '숨김';
+    d.querySelector('.pos').title = `파일 ${String(n).padStart(2,'0')}.webp`;
+    const pn=d.querySelector('.pn'), nm=NUMS[n];
+    if(nm && vis){ pn.style.display='flex'; pn.style.background=nm.bg; pn.style.color=nm.fg; pn.textContent=pos; } else pn.style.display='none';
+  });
+  $('scount').textContent = `슬라이드 ${total}장 · 보기 화면 ${pos}장 + 마지막 안내 2장 = ${pos+2}장`;
+}
+/* 슬라이드 삭제: 이미지 파일을 저장소에서 지우고 목록(deleted)에 올린다. 번호는 자동으로 다시 매겨진다. */
+async function deleteSlide(n){
+  const pos=[...document.querySelectorAll('#sgrid .sc')].filter(d=>!C.hidden.includes(+d.dataset.n)).findIndex(d=>+d.dataset.n===n)+1;
+  const label = pos>0 ? `${pos}번 슬라이드(파일 ${n})` : `숨김 슬라이드(파일 ${n})`;
+  const pending = dirty ? '\n\n※ 저장하지 않은 다른 변경도 이때 함께 저장됩니다.' : '';
+  if(!confirm(`${label}를 삭제합니다.\n이미지 파일이 저장소에서 지워지고, 뒤쪽 슬라이드 번호가 자동으로 앞당겨집니다.\n되돌리려면 저장소 기록에서 꺼내야 합니다.${pending}\n\n삭제할까요?`)) return;
+  if(dirty){ const bad=validate(); if(bad.length) return toast('저장하지 않은 변경에 오류가 있어 삭제하지 않았습니다: '+bad[0],'err'); }
+  try {
+    const path=`slides/${String(n).padStart(2,'0')}.webp`, meta=await getMeta(path);
+    await gh(`/repos/${REPO}/contents/${path}`,{method:'DELETE',body:JSON.stringify({message:`관리자: 파일 ${n}번 슬라이드 삭제`,sha:meta.sha,branch:BRANCH,committer:ident(),author:ident()})});
+    C.deleted=[...new Set([...C.deleted,n])].sort((a,b)=>a-b);
+    C.hidden=C.hidden.filter(x=>x!==n);
+    await saveContent(`관리자: 파일 ${n}번 삭제 목록 반영`);
+    setDirty(false);
+    document.querySelector(`#sgrid .sc[data-n="${n}"]`)?.remove(); refreshNumbers();
+    toast(`${label}를 삭제했습니다. 뒤쪽 번호가 다시 매겨졌습니다. 사이트 반영까지 1~2분 걸립니다.`,'ok');
+  } catch(e){ toast(e.message,'err'); }
 }
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
@@ -296,16 +342,7 @@ $('mapply').onclick=async()=>{
   } catch(e){ toast(e.message,'err'); }
   $('mapply').disabled=false;
 };
-$('mdel').onclick=async()=>{
-  if(!confirm(`${rn}번 슬라이드 이미지 파일을 저장소에서 삭제합니다. 복구하려면 저장소 기록에서 꺼내야 합니다. 진행할까요?`)) return;
-  try {
-    const path=`slides/${String(rn).padStart(2,'0')}.webp`, meta=await getMeta(path);
-    await gh(`/repos/${REPO}/contents/${path}`,{method:'DELETE',body:JSON.stringify({message:`관리자: ${rn}번 슬라이드 삭제`,sha:meta.sha,branch:BRANCH,committer:ident(),author:ident()})});
-    if(!C.hidden.includes(rn)) C.hidden=[...C.hidden,rn].sort((a,b)=>a-b);
-    await saveContent(`관리자: ${rn}번 슬라이드 숨김 처리`);
-    toast('삭제했고 보기 화면에서도 건너뜁니다.','ok'); $('modal').classList.remove('open'); renderSlides();
-  } catch(e){ toast(e.message,'err'); }
-};
+$('mdel').onclick=async()=>{ const n=rn; $('modal').classList.remove('open'); await deleteSlide(n); };
 
 if (tok) login();
 </script>

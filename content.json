@@ -13,7 +13,6 @@
     53,
     60,
     70,
-    76,
     77,
     79,
     84,
@@ -52,5 +51,7 @@
     "sheet": "https://docs.google.com/spreadsheets/d/1PrVN98T5tldfjfXZkKKAIxWvt0SsodHQirtY9iDSj8g/edit?usp=sharing",
     "qrCaption": "휴대폰 카메라로 스캔"
   },
-  "deleted": []
+  "deleted": [
+    76
+  ]
 }

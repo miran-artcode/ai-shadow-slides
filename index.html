@@ -16,6 +16,9 @@
   #links { position:absolute; inset:0; z-index:2; pointer-events:none; }
   #links a { position:absolute; pointer-events:auto; cursor:pointer; border-radius:3px; }
   #links a:hover, #links a:focus-visible { background:rgba(240,160,32,.22); outline:2px solid var(--accent); }
+  /* 그림에 찍힌 옛 번호(실제 순서보다 1 큼)를 배경색으로 덮고, 현재 순서 번호를 같은 서식으로 다시 그림 */
+  #pnum { position:absolute; left:88.889%; top:94.321%; width:6.111%; height:4.444%; z-index:1; display:none; align-items:center; justify-content:flex-end;
+    font:700 1.25cqw/1 "Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif; pointer-events:none; }
   #frame { container-type:inline-size; z-index:2; cursor:pointer; }
   .endpage { position:absolute; inset:0; z-index:3; display:none; background:linear-gradient(#e7e7e7 52%, #9fc5e8 52%);
     font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif; color:#1a1a1a; }
@@ -73,7 +76,7 @@
 <div id="stage">
   <div class="nav-zone left" aria-hidden="true"></div>
   <div class="nav-zone right" aria-hidden="true"></div>
-  <div id="frame"><img id="slide" alt=""><div id="links"></div>
+  <div id="frame"><img id="slide" alt=""><div id="pnum"></div><div id="links"></div>
     <section class="endpage" id="endApps" aria-label="홈페이지 모음"></section>
     <section class="endpage act" id="endAct" aria-label="활동 시트"></section>
   </div>
@@ -89,8 +92,8 @@
 </div>
 <script>
 const IMG_COUNT = 123;
-const DEFAULT_CONTENT = {hidden:[],rev:{},apps:{titlePre:"제가 만든 ",titleEm:"웹 앱 모음",rows:[],moreLabel:"",moreUrl:""},act:{eyebrow:"",line1:"",line2:"",desc:"",button:"열기 ↗",sheet:"",qrCaption:""}};
-let C = DEFAULT_CONTENT, LINKS = [], PAGES = [], cur = 1;
+const DEFAULT_CONTENT = {hidden:[],deleted:[],rev:{},apps:{titlePre:"제가 만든 ",titleEm:"웹 앱 모음",rows:[],moreLabel:"",moreUrl:""},act:{eyebrow:"",line1:"",line2:"",desc:"",button:"열기 ↗",sheet:"",qrCaption:""}};
+let C = DEFAULT_CONTENT, LINKS = [], NUMS = {}, PAGES = [], cur = 1;
 const $ = id => document.getElementById(id);
 const img = $('slide'), num = $('num'), grid = $('grid'), bar = $('progress').firstElementChild;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -101,7 +104,7 @@ const cache = {};
 function preload(p){ if(p && p.t==='img' && !cache[p.n]){ cache[p.n]=new Image(); cache[p.n].src=src(p.n); } }
 
 function buildPages(){
-  const hidden = new Set(C.hidden || []);
+  const hidden = new Set([...(C.hidden || []), ...(C.deleted || [])]);   // 숨김 + 삭제 = 건너뜀
   PAGES = [];
   for(let n=1;n<=IMG_COUNT;n++) if(!hidden.has(n)) PAGES.push({t:'img', n});
   PAGES.push({t:'apps'}, {t:'act'});
@@ -155,6 +158,8 @@ function go(n, push=true){
   img.style.visibility = p.t==='img' ? '' : 'hidden';
   if(p.t==='img'){ img.src = src(p.n); img.alt = `슬라이드 ${n}`; }
   num.value = n; bar.style.width = (n/T*100)+'%';
+  const pn = $('pnum'), nm = p.t==='img' ? NUMS[p.n] : null;
+  if(nm){ pn.style.display='flex'; pn.style.background=nm.bg; pn.style.color=nm.fg; pn.textContent=n; } else pn.style.display='none';
   renderLinks();
   if(push) history.replaceState(null,'','#'+n);
   preload(PAGES[n]); preload(PAGES[n+1]); preload(PAGES[n-2]);
@@ -197,6 +202,7 @@ window.addEventListener('hashchange',()=>go(parseInt(location.hash.slice(1)),fal
 async function start(){
   try { const r = await fetch('content.json?t='+Date.now(), {cache:'no-store'}); if(r.ok) C = Object.assign({}, DEFAULT_CONTENT, await r.json()); } catch(e) {}
   try { const r = await fetch('links.json'); if(r.ok) LINKS = await r.json(); } catch(e) {}
+  try { const r = await fetch('numbers.json'); if(r.ok) NUMS = await r.json(); } catch(e) {}
   buildPages(); renderEnd(); renderGrid();
   go(parseInt(location.hash.slice(1)) || 1, false);
 }
