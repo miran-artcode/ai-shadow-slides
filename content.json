@@ -1,5 +1,7 @@
 {
-  "hidden": [],
+  "hidden": [
+    76
+  ],
   "rev": {},
   "apps": {
     "titlePre": "제가 만든 ",
